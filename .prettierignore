@@ -1,0 +1,10 @@
+node_modules
+.next
+.local-db
+public/monaco
+package-lock.json
+prisma/migrations
+test-results
+playwright-report
+.env
+*.tsbuildinfo

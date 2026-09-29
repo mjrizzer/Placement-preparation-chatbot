@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  createdAt DateTime @default(now())
+  profile Profile?
+  authSessions AuthSession[]
+  interviews InterviewSession[]
+  questions Question[]
+  plans ImprovementPlan[]
+  operation OperationLock?
+}
+model AuthSession {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model Profile {
+  id String @id @default(cuid())
+  userId String @unique
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  name String
+  college String
+  degree String
+  branch String
+  graduationYear Int
+  level String
+  role String
+  languages String[]
+  areas String[]
+  resumeText String?
+  updatedAt DateTime @updatedAt
+}
+model InterviewSession {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  mode String
+  difficulty String
+  language String
+  company String?
+  topic String?
+  targetCount Int @default(10)
+  status String @default("active")
+  startedAt DateTime @default(now())
+  endedAt DateTime?
+  expiresAt DateTime?
+  report Json?
+  questions Question[]
+  @@index([userId,startedAt])
+}
+model Question {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  sessionId String
+  session InterviewSession @relation(fields:[sessionId],references:[id],onDelete:Cascade)
+  position Int
+  content String
+  hash String
+  embedding Float[]
+  embeddingModel String
+  concept String
+  topic String
+  difficulty String
+  kind String
+  payload Json
+  hintsUsed Int @default(0)
+  createdAt DateTime @default(now())
+  attempt QuestionAttempt?
+  submissions CodingSubmission[]
+  @@unique([userId,hash])
+  @@unique([sessionId,position])
+  @@index([userId,topic])
+  @@index([userId,createdAt])
+}
+model QuestionAttempt {
+  id String @id @default(cuid())
+  questionId String @unique
+  question Question @relation(fields:[questionId],references:[id],onDelete:Cascade)
+  answer String
+  score Float
+  feedback Json
+  timeTaken Int
+  createdAt DateTime @default(now())
+  mistakes Mistake[]
+}
+model Mistake {
+  id String @id @default(cuid())
+  attemptId String
+  attempt QuestionAttempt @relation(fields:[attemptId],references:[id],onDelete:Cascade)
+  type String
+  topic String
+  explanation String
+  correction String
+  @@index([attemptId])
+}
+model CodingSubmission {
+  id String @id @default(cuid())
+  questionId String
+  question Question @relation(fields:[questionId],references:[id],onDelete:Cascade)
+  source String
+  language String
+  isFinal Boolean @default(false)
+  results Json
+  passed Int
+  total Int
+  createdAt DateTime @default(now())
+  @@index([questionId,createdAt])
+}
+model ImprovementPlan {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  summary String
+  createdAt DateTime @default(now())
+  tasks ImprovementTask[]
+  @@index([userId,createdAt])
+}
+model ImprovementTask {
+  id String @id @default(cuid())
+  planId String
+  plan ImprovementPlan @relation(fields:[planId],references:[id],onDelete:Cascade)
+  day Int
+  title String
+  topic String
+  mode String
+  minutes Int
+  completed Boolean @default(false)
+}
+model Topic {
+  id String @id @default(cuid())
+  name String @unique
+  category String
+}
+model RateLimit {
+  key String @id
+  count Int
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model OperationLock {
+  userId String @id
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  token String
+  expiresAt DateTime
+}

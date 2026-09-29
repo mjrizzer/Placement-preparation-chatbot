@@ -1,0 +1,58 @@
+{
+  "name": "ai-placement-prep",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:ui": "playwright test",
+    "test:db": "vitest run tests/database.integration.test.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "predev": "node scripts/assets.mjs",
+    "prebuild": "node scripts/assets.mjs",
+    "db:local": "node scripts/local-db.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:live": "vitest run tests/live.test.ts",
+    "local": "node scripts/local.mjs"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "^3.0.3",
+    "lucide-react": "^0.577.0",
+    "monaco-editor": "^0.57.0",
+    "next": "16.3.6",
+    "openai": "^6.32.0",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.8.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "16.3.6",
+    "prettier": "^3.9.9",
+    "prisma": "6.19.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  }
+}
