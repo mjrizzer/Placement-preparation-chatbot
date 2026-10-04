@@ -38,6 +38,8 @@ suite('PostgreSQL interview lifecycle (mocked external providers)', () => {
     await db.$connect();
   });
   beforeEach(async () => {
+    vi.stubEnv('PRACTICE_MODE', '');
+    vi.stubEnv('GEMINI_API_KEY', '');
     vi.stubEnv('OPENAI_API_KEY', 'mock-provider-only');
     const user = await db.user.create({
       data: {
@@ -162,11 +164,14 @@ suite('PostgreSQL interview lifecycle (mocked external providers)', () => {
       });
     expect((await generateNext(userId, sessionId)).question).toBe('Describe deadlock detection.');
   });
-  it('fails closed when only duplicate questions can be generated', async () => {
+  it('uses an unseen bank question when AI only produces duplicates', async () => {
     const q = await generateNext(userId, sessionId);
     await submitAnswer(userId, q.id, 'Indexed access.');
-    await expect(generateNext(userId, sessionId)).rejects.toMatchObject({ status: 503 });
-    expect(await db.question.count({ where: { userId } })).toBe(1);
+    const next = await generateNext(userId, sessionId);
+    expect(next.title).toContain('Practice bank:');
+    expect(next.question).not.toBe(q.question);
+    expect(await db.question.count({ where: { userId } })).toBe(2);
+    expect((await sessionDetail(userId, sessionId)).offline).toBe(true);
   });
   it('enforces student ownership on sessions and answers', async () => {
     const q = await generateNext(userId, sessionId);

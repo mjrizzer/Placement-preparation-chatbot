@@ -31,7 +31,11 @@ test('landing, authentication and responsive navigation', async ({ page }, testI
   await page.getByRole('button', { name: 'Let’s get started' }).click();
   await expect(page.getByRole('heading', { name: 'Ready when you are.' })).toBeVisible();
   await page.getByRole('button', { name: 'Generate my first question' }).click();
-  await expect(page.locator('.error-notice')).toContainText('AI is not configured');
+  await expect(
+    page.getByText('This session uses built-in beginner questions', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Your answer', { exact: true })).toBeVisible();
+  await expect(page.locator('.error-notice')).toHaveCount(0);
   await page.goto('/history');
   await expect(page.getByRole('link', { name: /Technical interview/ })).toBeVisible();
   if (testInfo.project.name === 'mobile')
