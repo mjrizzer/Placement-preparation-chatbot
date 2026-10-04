@@ -9,6 +9,7 @@ if (!existsSync('.env')) {
     `POSTGRES_PASSWORD=${password}`,
     'APP_URL=http://localhost:3000',
     'OPENAI_API_KEY=',
+    'GEMINI_API_KEY=',
     'JUDGE0_URL=',
     'JUDGE0_API_KEY=',
     '',

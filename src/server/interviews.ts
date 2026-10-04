@@ -29,7 +29,7 @@ export async function sessionDetail(userId: string, id: string) {
   const s = await ownedSession(userId, id);
   return {
     ...s,
-    offline: !process.env.OPENAI_API_KEY,
+    offline: !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY,
     questions: s.questions.map((q) => ({
       ...publicQuestion(q),
       createdAt: q.createdAt,

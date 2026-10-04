@@ -6,6 +6,8 @@ import {
   ImprovementPlanner,
   equivalent,
   OpenAIProvider,
+  GeminiProvider,
+  getRemoteProvider,
   type AIProvider,
 } from '@/server/ai';
 import { question, evaluation, plan } from './fixtures';
@@ -23,6 +25,7 @@ function provider(output: unknown) {
       return schema.parse(output);
     },
     embed: vi.fn(async () => [1, 0]),
+    embeddingModel: 'test-model',
   } satisfies AIProvider & { calls: unknown[][] };
 }
 describe('AI services', () => {
@@ -113,6 +116,23 @@ describe('AI services', () => {
   });
   it('fails explicitly without an API key and never serves fixed questions', async () => {
     vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('GEMINI_API_KEY', '');
     await expect(new OpenAIProvider().embed('test')).rejects.toMatchObject({ status: 503 });
+    await expect(new GeminiProvider().embed('test')).rejects.toMatchObject({ status: 503 });
+  });
+  it('selects provider based on environment variables', () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('GEMINI_API_KEY', '');
+    expect(getRemoteProvider()).toBeNull();
+    
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test');
+    expect(getRemoteProvider()).toBeInstanceOf(OpenAIProvider);
+    
+    vi.stubEnv('OPENAI_API_KEY', '');
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-test');
+    expect(getRemoteProvider()).toBeInstanceOf(GeminiProvider);
+    
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test');
+    expect(getRemoteProvider()).toBeInstanceOf(GeminiProvider); // Gemini takes precedence
   });
 });

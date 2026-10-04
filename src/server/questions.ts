@@ -105,7 +105,7 @@ export async function generateNext(userId: string, sessionId: string) {
       : session.mode === 'Mixed'
         ? ['Technical', 'Quantitative Aptitude', 'DSA', 'Logical Reasoning', 'HR'][position % 5]
         : session.mode;
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
     const history = await db.question.findMany({ where: { userId }, select: { hash: true } });
     const seen = new Set(history.map((q) => q.hash));
     const bank = offlineBank(mode);
@@ -146,7 +146,7 @@ export async function generateNext(userId: string, sessionId: string) {
             ? new ResumeInterviewer()
             : new QuestionGenerator();
   const last = session.questions.at(-1)?.attempt?.feedback as { followUp?: string } | undefined;
-  const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
+  const embeddingModel = ai.embeddingModel;
   const recent = await db.question.findMany({
     where: { userId },
     select: { content: true, concept: true },
