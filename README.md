@@ -215,3 +215,21 @@ Do not interpret deterministic-provider test success as validation of real model
 Sessions use random 256-bit opaque cookies, SHA-256 token hashes in PostgreSQL, seven-day expiry, HttpOnly, SameSite=Lax, and Secure in production. Passwords use bcrypt cost 12. All private reads/writes apply user ownership; mutations require the configured exact origin. Zod validates inputs, Prisma parameterizes queries, React escapes user output, and headers restrict framing and resource loading. The CSP permits Monaco's worker/evaluation requirements; it is not a substitute for safe rendering. Server secrets never reach the client.
 
 Account email verification, self-service forgotten-password email, OAuth, billing, a durable AI job queue, OCR, and language-server formatting beyond Monaco's built-in support are not included. Password changes are available to signed-in users. Email delivery would require its own provider and token lifecycle. These are explicit deployment/product extensions, not simulated controls.
+
+## Generated TypeScript files
+
+`next-env.d.ts` and `.next` are generated locally and are not committed. Do not combine imports from `.next/dev/types` and `.next/types` manually. Next.js chooses the correct paths for each command. Dependency installation generates the initial declarations; `npm run typecheck` refreshes route types before checking the project. If your editor reports missing generated declarations after switching branches, run `npm run typecheck`, then restart its TypeScript server if necessary.
+
+## Gemini configuration
+
+Gemini is supported for fresh interview questions, evaluations, reports, study plans, and question embeddings. Add your own key privately to the ignored `.env` file:
+
+```dotenv
+GEMINI_API_KEY=your_google_ai_studio_key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+```
+
+Restart `npm run local` after changing configuration. Gemini takes priority when both Gemini and OpenAI keys are set. With neither key, supported interviews use the offline question bank. The `/demo` page remains a preset sample; use a signed-in interview to generate AI questions. Never commit the key or use a `NEXT_PUBLIC_` variable for it. Model access and quota depend on your Google project. Judge0 is still required for code execution.
+
+Gemini uses Zod 4's native JSON Schema conversion and validates returned JSON against the original contracts. The retired `text-embedding-004` default has been replaced. Existing question history created with a different online embedding model requires re-embedding before new AI questions can be generated; the app rejects incompatible vectors instead of comparing them.

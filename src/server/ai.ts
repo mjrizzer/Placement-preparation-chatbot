@@ -2,7 +2,6 @@ import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { GoogleGenAI } from '@google/genai';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   evaluationSchema,
   planSchema,
@@ -82,7 +81,7 @@ export class OpenAIProvider implements AIProvider {
   }
 }
 export class GeminiProvider implements AIProvider {
-  embeddingModel = process.env.GEMINI_EMBEDDING_MODEL || 'text-embedding-004';
+  embeddingModel = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
 
   private client() {
     if (!process.env.GEMINI_API_KEY)
@@ -90,7 +89,10 @@ export class GeminiProvider implements AIProvider {
         503,
         'AI is not configured. Ask the administrator to add the server API key.',
       );
-    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    return new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: { timeout: 60_000 },
+    });
   }
 
   async structured<T>(
@@ -106,8 +108,8 @@ export class GeminiProvider implements AIProvider {
         config: {
           systemInstruction: guard + '\n' + instructions,
           responseMimeType: 'application/json',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          responseSchema: zodToJsonSchema(schema as any) as any,
+          responseJsonSchema: z.toJSONSchema(schema),
+          maxOutputTokens: 8192,
         },
       });
       const output = response.text;
@@ -130,7 +132,8 @@ export class GeminiProvider implements AIProvider {
         contents: text,
       });
       const v = response.embeddings?.[0]?.values;
-      if (!v?.length || v.some((x: number) => !Number.isFinite(x))) throw new Error('Invalid vector');
+      if (!v?.length || v.some((x: number) => !Number.isFinite(x)))
+        throw new Error('Invalid vector');
       return v;
     } catch (e) {
       if (e instanceof AppError) throw e;
@@ -153,7 +156,12 @@ export const ai: AIProvider = {
     const remote = getRemoteProvider();
     return remote ? remote.embeddingModel : 'offline-bank-v1';
   },
-  structured: async <T>(name: string, instructions: string, data: unknown, schema: z.ZodType<T>) => {
+  structured: async <T>(
+    name: string,
+    instructions: string,
+    data: unknown,
+    schema: z.ZodType<T>,
+  ) => {
     const remote = getRemoteProvider();
     return remote
       ? remote.structured(name, instructions, data, schema)
@@ -161,7 +169,8 @@ export const ai: AIProvider = {
   },
   embed: (text: string) => {
     const remote = getRemoteProvider();
-    if (!remote) throw new AppError(503, 'AI is not configured. Embeddings are not available offline.');
+    if (!remote)
+      throw new AppError(503, 'AI is not configured. Embeddings are not available offline.');
     return remote.embed(text);
   },
 };
