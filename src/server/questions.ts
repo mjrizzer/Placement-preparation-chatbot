@@ -5,6 +5,7 @@ import { type GeneratedQuestion, questionSchema, type PublicQuestion } from '@/l
 import { topics, sectionFor } from '@/lib/catalog';
 import {
   ai,
+  getRemoteProvider,
   equivalent,
   QuestionGenerator,
   AptitudeGenerator,
@@ -14,7 +15,7 @@ import {
 } from './ai';
 import { executeTests } from './execution';
 import type { Question } from '@prisma/client';
-import { offlineBank } from './offline';
+import { offlineBank, isBankQuestion } from './offline';
 export function publicQuestion(q: Question): PublicQuestion {
   const data = questionSchema.parse(q.payload);
   return {
@@ -105,7 +106,12 @@ export async function generateNext(userId: string, sessionId: string) {
       : session.mode === 'Mixed'
         ? ['Technical', 'Quantitative Aptitude', 'DSA', 'Logical Reasoning', 'HR'][position % 5]
         : session.mode;
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+  const saveBankQuestion = async () => {
+    if (session.mode === 'Mock')
+      throw new AppError(
+        503,
+        'Full mock tests need a working AI service. Choose a standard practice subject instead.',
+      );
     const history = await db.question.findMany({ where: { userId }, select: { hash: true } });
     const seen = new Set(history.map((q) => q.hash));
     const bank = offlineBank(mode);
@@ -115,7 +121,7 @@ export async function generateNext(userId: string, sessionId: string) {
     if (!candidate)
       throw new AppError(
         409,
-        'You have completed this offline question bank. Try another practice mode, or add an AI key for new questions.',
+        'You have completed this question bank. Choose another subject, or start an AI session when the service is available.',
       );
     const saved = await db.question.create({
       data: {
@@ -134,134 +140,151 @@ export async function generateNext(userId: string, sessionId: string) {
       },
     });
     return publicQuestion(saved);
-  }
-  const generator =
-    mode === 'Coding'
-      ? new CodingProblemGenerator()
-      : ['Aptitude', 'Quantitative Aptitude', 'Logical Reasoning', 'Verbal'].includes(mode)
-        ? new AptitudeGenerator()
-        : mode === 'DSA'
-          ? new DSAGenerator()
-          : mode === 'Resume'
-            ? new ResumeInterviewer()
-            : new QuestionGenerator();
-  const last = session.questions.at(-1)?.attempt?.feedback as { followUp?: string } | undefined;
-  const embeddingModel = ai.embeddingModel;
-  const recent = await db.question.findMany({
-    where: { userId },
-    select: { content: true, concept: true },
-    orderBy: { createdAt: 'desc' },
-    take: 40,
-  });
-  for (let retry = 0; retry < 5; retry++) {
-    const candidate = await generator.generate({
-      ...context,
-      mode,
-      difficulty: session.difficulty,
-      language: session.language,
-      company: session.company,
-      requestedTopic: session.topic,
-      topicCatalog: topics,
-      focus:
-        position % 3 === 2
-          ? 'Explore a different topic or strength'
-          : 'Prioritize weaknesses when relevant',
-      previousQuestions: recent.map((q) => ({ ...q, content: q.content.slice(0, 1200) })),
-      followUp: session.mode !== 'Mock' && position % 3 !== 2 ? last?.followUp : null,
-      retry,
+  };
+  if (!getRemoteProvider() || session.questions.some((q) => isBankQuestion(q.payload)))
+    return saveBankQuestion();
+  try {
+    const generator =
+      mode === 'Coding'
+        ? new CodingProblemGenerator()
+        : ['Aptitude', 'Quantitative Aptitude', 'Logical Reasoning', 'Verbal'].includes(mode)
+          ? new AptitudeGenerator()
+          : mode === 'DSA'
+            ? new DSAGenerator()
+            : mode === 'Resume'
+              ? new ResumeInterviewer()
+              : new QuestionGenerator();
+    const last = session.questions.at(-1)?.attempt?.feedback as { followUp?: string } | undefined;
+    const embeddingModel = ai.embeddingModel;
+    const recent = await db.question.findMany({
+      where: { userId },
+      select: { content: true, concept: true },
+      orderBy: { createdAt: 'desc' },
+      take: 40,
     });
-    if (
-      (mode === 'Coding') !== Boolean(candidate.coding) ||
-      (candidate.kind === 'coding') !== Boolean(candidate.coding) ||
-      candidate.hints.length < 2 ||
-      candidate.question.trim().length < 10 ||
-      candidate.question.length > 12000
-    )
-      continue;
-    candidate.difficulty = session.difficulty as GeneratedQuestion['difficulty'];
-    const hash = hashQuestion(candidate.question);
-    if (
-      await db.question.findUnique({
-        where: { userId_hash: { userId, hash } },
-        select: { id: true },
-      })
-    )
-      continue;
-    const embedding = await ai.embed(
-      candidate.question + '\nAssessment intent: ' + candidate.concept,
-    );
-    let cursor: string | undefined;
-    let duplicate = false;
-    let nearest: { content: string; concept: string; similarity: number }[] = [];
-    do {
-      const page = await db.question.findMany({
-        where: { userId },
-        select: { id: true, content: true, concept: true, embedding: true, embeddingModel: true },
-        orderBy: { id: 'asc' },
-        take: 250,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    for (let retry = 0; retry < 5; retry++) {
+      const candidate = await generator.generate({
+        ...context,
+        mode,
+        difficulty: session.difficulty,
+        language: session.language,
+        company: session.company,
+        requestedTopic: session.topic,
+        topicCatalog: topics,
+        focus:
+          position % 3 === 2
+            ? 'Explore a different topic or strength'
+            : 'Prioritize weaknesses when relevant',
+        previousQuestions: recent.map((q) => ({ ...q, content: q.content.slice(0, 1200) })),
+        followUp: session.mode !== 'Mock' && position % 3 !== 2 ? last?.followUp : null,
+        retry,
       });
-      for (const old of page) {
-        if (old.embeddingModel === 'offline-bank-v1') {
-          old.embedding = await ai.embed(old.content + '\nAssessment intent: ' + old.concept);
-          old.embeddingModel = embeddingModel;
-          await db.question.update({
-            where: { id: old.id },
-            data: { embedding: old.embedding, embeddingModel },
-          });
-        }
-        if (old.embeddingModel !== embeddingModel || old.embedding.length !== embedding.length)
-          throw new AppError(
-            503,
-            'Embedding model changed. Re-embed question history before generating new questions.',
-          );
-        const similarity = cosine(embedding, old.embedding);
-        if (similarity >= 0.94) duplicate = true;
-        if (similarity >= 0.65)
-          nearest.push({ content: old.content, concept: old.concept, similarity });
-      }
-      nearest = nearest.sort((a, b) => b.similarity - a.similarity).slice(0, 12);
-      cursor = page.length === 250 ? page.at(-1)?.id : undefined;
-    } while (cursor && !duplicate);
-    if (duplicate || (await equivalent(candidate, nearest))) {
-      recent.push({ content: candidate.question, concept: candidate.concept });
-      continue;
-    }
-    if (candidate.coding) {
-      const coding = candidate.coding;
       if (
-        coding.hiddenTests.length < 5 ||
-        coding.hiddenTests.length > 8 ||
-        coding.examples.length < 1 ||
-        coding.examples.length > 3
+        (mode === 'Coding') !== Boolean(candidate.coding) ||
+        (candidate.kind === 'coding') !== Boolean(candidate.coding) ||
+        candidate.hints.length < 2 ||
+        candidate.question.trim().length < 10 ||
+        candidate.question.length > 12000
       )
         continue;
-      const checked = await executeTests(coding.referencePython, 'Python', [
-        ...coding.examples,
-        ...coding.hiddenTests,
-      ]);
-      if (checked.some((t) => !t.passed)) continue;
+      candidate.difficulty = session.difficulty as GeneratedQuestion['difficulty'];
+      const hash = hashQuestion(candidate.question);
+      if (
+        await db.question.findUnique({
+          where: { userId_hash: { userId, hash } },
+          select: { id: true },
+        })
+      )
+        continue;
+      const embedding = await ai.embed(
+        candidate.question + '\nAssessment intent: ' + candidate.concept,
+      );
+      let cursor: string | undefined;
+      let duplicate = false;
+      let nearest: { content: string; concept: string; similarity: number }[] = [];
+      do {
+        const page = await db.question.findMany({
+          where: { userId },
+          select: { id: true, content: true, concept: true, embedding: true, embeddingModel: true },
+          orderBy: { id: 'asc' },
+          take: 250,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
+        for (const old of page) {
+          if (old.embeddingModel === 'offline-bank-v1') {
+            old.embedding = await ai.embed(old.content + '\nAssessment intent: ' + old.concept);
+            old.embeddingModel = embeddingModel;
+            await db.question.update({
+              where: { id: old.id },
+              data: { embedding: old.embedding, embeddingModel },
+            });
+          }
+          if (old.embeddingModel !== embeddingModel || old.embedding.length !== embedding.length)
+            throw new AppError(
+              503,
+              'Embedding model changed. Re-embed question history before generating new questions.',
+            );
+          const similarity = cosine(embedding, old.embedding);
+          if (similarity >= 0.94) duplicate = true;
+          if (similarity >= 0.65)
+            nearest.push({ content: old.content, concept: old.concept, similarity });
+        }
+        nearest = nearest.sort((a, b) => b.similarity - a.similarity).slice(0, 12);
+        cursor = page.length === 250 ? page.at(-1)?.id : undefined;
+      } while (cursor && !duplicate);
+      if (duplicate || (await equivalent(candidate, nearest))) {
+        recent.push({ content: candidate.question, concept: candidate.concept });
+        continue;
+      }
+      if (candidate.coding) {
+        const coding = candidate.coding;
+        if (
+          coding.hiddenTests.length < 5 ||
+          coding.hiddenTests.length > 8 ||
+          coding.examples.length < 1 ||
+          coding.examples.length > 3
+        )
+          continue;
+        const checked = await executeTests(coding.referencePython, 'Python', [
+          ...coding.examples,
+          ...coding.hiddenTests,
+        ]);
+        if (checked.some((t) => !t.passed)) continue;
+      }
+      const saved = await db.question.create({
+        data: {
+          userId,
+          sessionId,
+          position,
+          content: candidate.question,
+          hash,
+          embedding,
+          embeddingModel,
+          concept: candidate.concept,
+          topic: candidate.topic,
+          difficulty: candidate.difficulty,
+          kind: candidate.kind,
+          payload: candidate,
+        },
+      });
+      return publicQuestion(saved);
     }
-    const saved = await db.question.create({
-      data: {
-        userId,
-        sessionId,
-        position,
-        content: candidate.question,
-        hash,
-        embedding,
-        embeddingModel,
-        concept: candidate.concept,
-        topic: candidate.topic,
-        difficulty: candidate.difficulty,
-        kind: candidate.kind,
-        payload: candidate,
-      },
-    });
-    return publicQuestion(saved);
+    throw new AppError(
+      503,
+      'Could not generate a sufficiently distinct, validated question. Please retry or choose another topic.',
+    );
+  } catch (error) {
+    const supported = [
+      'Technical',
+      'HR',
+      'DSA',
+      'Aptitude',
+      'Quantitative Aptitude',
+      'Logical Reasoning',
+      'Verbal',
+    ].includes(mode);
+    if (!supported || !(error instanceof AppError) || ![502, 503].includes(error.status))
+      throw error;
+    return saveBankQuestion();
   }
-  throw new AppError(
-    503,
-    'Could not generate a sufficiently distinct, validated question. Please retry or choose another topic.',
-  );
 }

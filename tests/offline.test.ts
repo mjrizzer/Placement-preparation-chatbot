@@ -6,7 +6,7 @@ describe('offline practice', () => {
   it('has valid, distinct original questions for each basic mode', () => {
     for (const mode of ['Technical', 'HR', 'DSA', 'Aptitude', 'Logical Reasoning', 'Verbal']) {
       const bank = offlineBank(mode);
-      expect(bank.length).toBeGreaterThanOrEqual(5);
+      expect(bank.length).toBeGreaterThanOrEqual(15);
       expect(new Set(bank.map((q) => q.concept)).size).toBe(bank.length);
       bank.forEach((q) => questionSchema.parse(q));
     }

@@ -9,9 +9,9 @@ import '@fontsource/manrope/700.css';
 import '@fontsource/manrope/800.css';
 import './globals.css';
 export const metadata: Metadata = {
-  title: 'AI Placement Prep — Your next chapter starts here',
+  title: 'Placement Prep',
   description:
-    'Personalized AI interviews, coding practice, and a clear path to placement readiness.',
+    'Interview questions, aptitude practice and saved results for placement preparation.',
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

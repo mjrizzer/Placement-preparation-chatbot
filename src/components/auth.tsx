@@ -32,7 +32,7 @@ export default function Auth({ signup = false }: { signup?: boolean }) {
           <span className="brand-mark">
             <Command />
           </span>
-          AI Placement Prep
+          Placement Prep
         </Link>
         <div>
           <span className="eyebrow">PLACEMENT PRACTICE</span>

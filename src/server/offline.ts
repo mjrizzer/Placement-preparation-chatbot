@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { questionSchema, type GeneratedQuestion } from '@/lib/contracts';
 import { AppError } from '@/lib/http';
+import { extraQuestions } from './question-bank';
 
 // Original project questions. Stable assessment IDs prevent bank questions repeating.
 type Entry = [string, string, string, string[]];
@@ -137,11 +138,16 @@ const hr: Entry[] = [
   ],
 ];
 
+export function isBankQuestion(value: unknown): boolean {
+  const result = questionSchema.safeParse(value);
+  return result.success && /^(Offline practice|Practice bank:)/.test(result.data.title);
+}
+
 export function offlineBank(mode: string): GeneratedQuestion[] {
-  if (mode === 'Coding')
+  if (['Coding', 'Resume', 'Company', 'Mock'].includes(mode))
     throw new AppError(
       503,
-      'Coding needs an AI key and a sandbox service. Try Technical, DSA or Aptitude, or open the sample practice at /demo.',
+      'This mode needs a working AI service (and a sandbox for coding). Choose Technical, HR, DSA or Aptitude for built-in practice.',
     );
   let entries = mode === 'DSA' ? dsa : mode === 'HR' ? hr : technical;
   let kind: GeneratedQuestion['kind'] = mode === 'DSA' ? 'dsa' : mode === 'HR' ? 'hr' : 'technical';
@@ -245,8 +251,10 @@ export function offlineBank(mode: string): GeneratedQuestion[] {
               ],
             ];
   }
+  const bankMode = mode === 'Quantitative Aptitude' ? 'Aptitude' : mode;
+  entries = [...entries, ...(extraQuestions[bankMode] ?? [])];
   return entries.map(([topic, question, explanation, expectedConcepts]) => ({
-    title: `Offline practice · ${topic}`,
+    title: `Practice bank: ${topic}`,
     topic,
     question,
     explanation,
@@ -271,7 +279,7 @@ export function offlineResponse(name: string, input: unknown): unknown {
       .object({ question: questionSchema, answer: z.string() })
       .parse(input);
     const normalized = answer.toLowerCase().trim().replace(/[.!]$/, '');
-    const objective = ['aptitude', 'verbal'].includes(question.kind);
+    const objective = isBankQuestion(question) && ['aptitude', 'verbal'].includes(question.kind);
     const matches = question.expectedConcepts.filter((c) =>
       c.split('|').some((word) => normalized.includes(word.toLowerCase())),
     );
@@ -332,7 +340,7 @@ export function offlineResponse(name: string, input: unknown): unknown {
   if (name === 'interview_report') {
     const data = z.object({ answered: z.number(), total: z.number() }).parse(input);
     return {
-      summary: `Offline practice complete: ${data.answered} of ${data.total} questions answered. Scores use basic answer matching, not AI assessment.`,
+      summary: `Offline practice complete: ${data.answered} of ${data.total} questions answered. This summary was prepared without AI. Review each saved answer for its feedback and scoring method.`,
       strengths: [],
       weaknesses: [],
       nextSteps: [

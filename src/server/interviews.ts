@@ -3,7 +3,14 @@ import { AppError } from '@/lib/http';
 import { questionSchema, evaluationSchema, type Evaluation } from '@/lib/contracts';
 import { adaptDifficulty, scoreEvaluation, mean } from '@/lib/math';
 import { topics, type Difficulty } from '@/lib/catalog';
-import { AnswerEvaluator, MistakeAnalyzer, ImprovementPlanner, InterviewAgent } from './ai';
+import {
+  AnswerEvaluator,
+  MistakeAnalyzer,
+  ImprovementPlanner,
+  InterviewAgent,
+  getRemoteProvider,
+} from './ai';
+import { isBankQuestion } from './offline';
 import { executeTests, executor } from './execution';
 import { publicQuestion, studentContext } from './questions';
 import type { Prisma } from '@prisma/client';
@@ -29,7 +36,7 @@ export async function sessionDetail(userId: string, id: string) {
   const s = await ownedSession(userId, id);
   return {
     ...s,
-    offline: !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY,
+    offline: !getRemoteProvider() || s.questions.some((q) => isBankQuestion(q.payload)),
     questions: s.questions.map((q) => ({
       ...publicQuestion(q),
       createdAt: q.createdAt,

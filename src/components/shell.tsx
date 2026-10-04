@@ -41,7 +41,7 @@ const StudentContext = createContext<{ user: Student; refresh: () => Promise<voi
 export const useStudent = () => useContext(StudentContext)!;
 const links = [
   ['Dashboard', '/dashboard', LayoutDashboard],
-  ['AI Interview', '/interview', AudioLines],
+  ['Interview practice', '/interview', AudioLines],
   ['Aptitude', '/aptitude', BrainCircuit],
   ['Coding', '/coding', Braces],
   ['DSA', '/dsa', GitBranch],
@@ -147,7 +147,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               >
                 <Icon size={18} />
                 <span>{name}</span>
-                {name === 'AI Interview' && <span className="tiny-label">AI</span>}
+                {name === 'Interview practice' && <span className="tiny-label">AI</span>}
               </Link>
             ))}
           </nav>

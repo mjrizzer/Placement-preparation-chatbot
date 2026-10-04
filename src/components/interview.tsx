@@ -318,9 +318,9 @@ export default function InterviewWorkspace({ id }: { id: string }) {
       </PageHeading>
       {session.offline && (
         <p className="mb-4 rounded-xl border p-4 text-sm">
-          Offline practice: built-in beginner questions, basic answer checks and saved progress.
-          Scores are estimates, not AI assessments. Advanced difficulty and AI follow-ups require an
-          API key.
+          This session uses built-in beginner questions when AI is unavailable or standard practice
+          is selected. These questions receive basic answer checks, not AI assessment. Your answers
+          and progress are saved.
         </p>
       )}
       <ErrorNotice message={error} />

@@ -52,7 +52,7 @@ type Analytics = {
 };
 const preparation = [
   {
-    title: 'AI Interview',
+    title: 'Interview practice',
     mode: 'Technical',
     href: '/interview',
     icon: AudioLines,
@@ -114,7 +114,7 @@ function Dashboard() {
   return (
     <>
       <PageHeading
-        eyebrow="AI PLACEMENT PREP"
+        eyebrow="PLACEMENT PREP"
         title={`Welcome, ${user.profile?.name.split(' ')[0] || 'student'}.`}
         description="Choose a practice area, answer a few questions, and review your results."
       />
@@ -304,7 +304,7 @@ function Practice({ section }: { section: string }) {
                 <label>
                   Focus topic
                   <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-                    <option value="">Let AI personalize it</option>
+                    <option value="">Choose a topic for me</option>
                     {pool.map((t) => (
                       <option key={t}>{t}</option>
                     ))}
@@ -482,7 +482,7 @@ function Profile({ onboarding = false }: { onboarding?: boolean }) {
       <PageHeading
         eyebrow={onboarding ? 'FIRST, A LITTLE ABOUT YOU' : 'YOUR PREPARATION, PERSONALIZED'}
         title={onboarding ? 'Set up your profile' : 'Your profile.'}
-        description="Help your AI interviewer understand your background and where you want to go."
+        description="Set your background, subjects and target role for practice."
       />
       <div className="profile-layout">
         <section className="panel">

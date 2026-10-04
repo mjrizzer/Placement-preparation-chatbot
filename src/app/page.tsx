@@ -32,7 +32,7 @@ export default function Landing() {
             </Link>
           </div>
           <p className="small" style={{ marginTop: 18 }}>
-            The sample works without signing in. Regular sessions use the configured AI service.
+            Try the sample without signing in, or create an account to save your practice results.
           </p>
         </section>
         <section className="student-cards">
